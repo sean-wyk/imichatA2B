@@ -1,5 +1,6 @@
 import type { ChatAttachment, ChatMessage } from "@/types/chat";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { MessageContent } from "./MessageContent";
 
 type MessageListProps = {
   messages: ChatMessage[];
@@ -8,10 +9,11 @@ type MessageListProps = {
   error: string | null;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   onImageClick?: (image: ChatAttachment) => void;
+  onDeleteMessage?: (messageId: string) => void;
 };
 
 function getInitial(name: string) {
-  return name.trim().charAt(0) || "匿";
+  return name.trim().charAt(0) || "?";
 }
 
 function getAvatarColor(name: string) {
@@ -36,18 +38,30 @@ export function MessageList({
   error,
   messagesEndRef,
   onImageClick,
+  onDeleteMessage,
 }: MessageListProps) {
   const hasMessages = messages.length > 0;
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(messageId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy", err);
+    }
+  };
 
   const systemTips = useMemo(() => {
     if (connecting) {
-      return "正在连接实时服务...";
+      return "Connecting...";
     }
     if (error) {
-      return `${error}（本地开发时请确保已在项目根目录配置 .env 环境变量）`;
+      return `${error}`;
     }
     if (!hasMessages) {
-      return "暂无消息，发送一条消息开始聊天吧～";
+      return "No messages yet. Send one to start chatting!";
     }
     return "";
   }, [connecting, error, hasMessages]);
@@ -77,7 +91,7 @@ export function MessageList({
             return (
               <div
                 key={msg.id}
-                className={`flex flex-col gap-1 ${
+                className={`flex flex-col gap-1 group ${
                   isSelf ? "items-end" : "items-start"
                 }`}
               >
@@ -103,13 +117,51 @@ export function MessageList({
                   </div>
                 </div>
                 <div
-                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs leading-relaxed shadow-sm transition ${
+                  className={`max-w-[80%] rounded-2xl px-3 py-2 shadow-sm transition ${
                     isSelf
-                      ? "bg-emerald-500 text-emerald-50 rounded-br-sm"
+                      ? "bg-emerald-600 text-white rounded-br-sm"
                       : "bg-white text-slate-900 rounded-bl-sm border border-slate-200"
                   }`}
                 >
-                  {msg.text}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      {msg.text && <MessageContent content={msg.text} isSelf={isSelf} />}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => handleCopy(msg.text, msg.id)}
+                        className={`p-1 rounded hover:bg-black/10 transition ${
+                          copiedId === msg.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                        title="Copy message"
+                      >
+                        {copiedId === msg.id ? (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                      {isSelf && onDeleteMessage && (
+                        <button
+                          onClick={() => {
+                            if (confirm("Delete this message?")) {
+                              onDeleteMessage(msg.id);
+                            }
+                          }}
+                          className="p-1 rounded hover:bg-black/10 transition opacity-0 group-hover:opacity-100"
+                          title="Delete message"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   {Array.isArray(msg.attachments) &&
                     msg.attachments.length > 0 && (
                       <div className="mt-2 space-y-2">
@@ -130,7 +182,7 @@ export function MessageList({
                                     className="max-h-48 w-full rounded-xl border border-slate-200 bg-slate-50 object-contain transition group-hover:border-emerald-400"
                                   />
                                   <span className="mt-1 block text-[10px] text-slate-400 opacity-0 group-hover:opacity-100">
-                                    点击图片可放大 / 下载
+                                    Click to enlarge
                                   </span>
                                 </button>
                               ) : hasUrl ? (
@@ -140,11 +192,11 @@ export function MessageList({
                                   rel="noreferrer"
                                   className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700 hover:border-emerald-400 hover:text-emerald-700"
                                 >
-                                  {att.name || "附件"}
+                                  {att.name || "File"}
                                 </a>
                               ) : (
                                 <span className="inline-flex items-center rounded-full border border-dashed border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-500">
-                                  {att.name || "附件"}（当前仅在本地展示名称）
+                                  {att.name || "File"}
                                 </span>
                               )}
                             </div>

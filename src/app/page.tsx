@@ -22,27 +22,23 @@ export default function Home() {
   const [previewImage, setPreviewImage] = useState<ChatAttachment | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // 初始化一个默认昵称
   useEffect(() => {
-    const defaultName = `用户${Math.floor(Math.random() * 9000) + 1000}`;
+    const defaultName = `User${Math.floor(Math.random() * 9000) + 1000}`;
     setUser(defaultName);
     setTempUser(defaultName);
   }, []);
 
-  // 滚动到最新消息
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // 初始化加载当天历史消息 + 连接 Pusher，订阅新消息
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
       try {
-        // 先拉取当天历史消息
         const res = await fetch("/api/messages");
         if (res.ok) {
           const data = (await res.json()) as { messages?: ChatMessage[] };
@@ -53,14 +49,14 @@ export default function Home() {
       } catch (e) {
         console.error(e);
         if (!cancelled) {
-          setError("加载历史消息失败");
+          setError("Failed to load messages");
         }
       }
 
       const pusher = getPusherClient();
       if (!pusher) {
         if (!cancelled) {
-          setError("实时服务未配置，请先在 Vercel 中配置 Pusher 环境变量。");
+          setError("Pusher not configured. Please set environment variables.");
           setConnecting(false);
         }
         return;
@@ -106,33 +102,38 @@ export default function Home() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "发送失败");
+        throw new Error(body.error || "Failed to send");
       }
 
       setText("");
       setAttachments([]);
     } catch (e) {
       console.error(e);
-      setError((e as Error).message || "发送消息失败");
+      setError((e as Error).message || "Failed to send message");
     } finally {
       setSending(false);
     }
   };
 
-  const title = useMemo(() => "实时聊天室", []);
+  const handleDeleteMessage = (messageId: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+  };
 
-  const handleFilesSelected = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const title = useMemo(() => "Chat Room", []);
+
+  const handleFilesSelected = async (files: File[] | FileList | null) => {
+    if (!files) return;
+    const fileArray = Array.isArray(files) ? files : Array.from(files);
+    if (fileArray.length === 0) return;
     setUploading(true);
     setError(null);
 
     try {
       const uploaded: ChatAttachment[] = [];
-      for (const file of Array.from(files)) {
+      for (const file of fileArray) {
         const isImage = file.type.startsWith("image/");
 
         if (isImage) {
-          // 仅图片调用后端代理图床接口
           const url = await uploadToImageHost(file);
           uploaded.push({
             url,
@@ -140,7 +141,6 @@ export default function Home() {
             type: "image",
           });
         } else {
-          // 文件先只透传名称，url 留空，后续可接入文件存储
           uploaded.push({
             url: "",
             name: file.name,
@@ -151,7 +151,7 @@ export default function Home() {
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (e) {
       console.error(e);
-      setError("上传失败，请稍后重试");
+      setError("Upload failed, please try again");
     } finally {
       setUploading(false);
     }
@@ -175,6 +175,7 @@ export default function Home() {
           error={error}
           messagesEndRef={messagesEndRef}
           onImageClick={(image) => setPreviewImage(image)}
+          onDeleteMessage={handleDeleteMessage}
         />
 
         <MessageInput
@@ -188,10 +189,7 @@ export default function Home() {
           onFilesSelected={handleFilesSelected}
         />
 
-        <p className="mt-2 text-[10px] text-slate-400">
-          本示例仅做演示，不做消息持久化。如果你需要保存聊天记录，可以后续接入数据库（例如
-          PlanetScale / Neon / Supabase 等）。
-        </p>
+
       </div>
       <ImagePreview image={previewImage} onClose={() => setPreviewImage(null)} />
     </main>

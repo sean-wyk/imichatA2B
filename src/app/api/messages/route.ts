@@ -3,6 +3,9 @@ import { pusherServer } from "@/lib/pusher";
 import type { ChatAttachment, ChatMessage } from "@/types/chat";
 import { redis } from "@/lib/redis";
 
+// 确保每次请求都会实时从 Redis 读取，而不是被 Next.js 缓存
+export const dynamic = "force-dynamic";
+
 function getTodayKey() {
   const now = new Date();
   const y = now.getFullYear();
@@ -14,21 +17,26 @@ function getTodayKey() {
 export async function GET() {
   try {
     const key = getTodayKey();
-    const raw = await redis.lrange<string>(key, 0, -1);
+    const raw = await redis.lrange<ChatMessage | string>(key, 0, -1);
     const messages: ChatMessage[] = [];
 
     for (const item of raw) {
-      try {
-        const parsed = JSON.parse(item) as ChatMessage;
-        messages.push(parsed);
-      } catch {
-        // ignore bad entries
+      if (!item) continue;
+      if (typeof item === "string") {
+        try {
+          const parsed = JSON.parse(item) as ChatMessage;
+          messages.push(parsed);
+        } catch {
+          // ignore bad string
+        }
+      } else {
+        messages.push(item as ChatMessage);
       }
     }
 
     return NextResponse.json({ messages });
   } catch (error) {
-    console.error("读取 Redis 消息失败", error);
+    console.error("Failed to read Redis messages", error);
     return NextResponse.json({ messages: [] });
   }
 }
@@ -46,17 +54,17 @@ export async function POST(req: NextRequest) {
 
     if (!hasText && !hasAttachments) {
       return NextResponse.json(
-        { error: "消息内容或附件不能为空" },
+        { error: "Message content or attachments cannot be empty" },
         { status: 400 },
       );
     }
 
-    const safeUser = (user || "匿名用户").slice(0, 20);
-    const safeText = (text || "").slice(0, 500);
+    const safeUser = (user || "Anonymous").slice(0, 50);
+    const safeText = text || "";
     const safeAttachments: ChatAttachment[] | undefined = hasAttachments
       ? attachments!.slice(0, 10).map((att) => ({
-          url: String(att.url).slice(0, 500),
-          name: String(att.name || "附件").slice(0, 100),
+          url: String(att.url).slice(0, 1000),
+          name: String(att.name || "File").slice(0, 200),
           type: att.type === "image" ? "image" : ("file" as const),
         }))
       : undefined;
@@ -71,21 +79,19 @@ export async function POST(req: NextRequest) {
     const key = getTodayKey();
 
     try {
-      // 存入 Redis 列表，并设置 2 天过期时间（秒）
-      await redis.rpush(key, JSON.stringify(message));
+      await redis.rpush(key, message);
       await redis.expire(key, 60 * 60 * 24 * 2);
     } catch (err) {
-      console.error("写入 Redis 失败", err);
-      // 即使写 Redis 失败，也尽量继续广播消息
+      console.error("Failed to write to Redis", err);
     }
 
     await pusherServer.trigger("public-chat", "new-message", message);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("发送消息失败", error);
+    console.error("Failed to send message", error);
     return NextResponse.json(
-      { error: "发送消息失败" },
+      { error: "Failed to send message" },
       { status: 500 },
     );
   }
