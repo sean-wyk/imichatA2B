@@ -3,20 +3,21 @@ import { pusherServer } from "@/lib/pusher";
 import type { ChatAttachment, ChatMessage } from "@/types/chat";
 import { redis } from "@/lib/redis";
 
-// 确保每次请求都会实时从 Redis 读取，而不是被 Next.js 缓存
 export const dynamic = "force-dynamic";
 
-function getTodayKey() {
+function getSessionKey(session: string) {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
-  return `chat:public:${y}-${m}-${d}`;
+  return `chat:${session}:${y}-${m}-${d}`;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const key = getTodayKey();
+    const { searchParams } = new URL(req.url);
+    const session = searchParams.get("session") || "default";
+    const key = getSessionKey(session);
     const raw = await redis.lrange<ChatMessage | string>(key, 0, -1);
     const messages: ChatMessage[] = [];
 
@@ -27,7 +28,7 @@ export async function GET() {
           const parsed = JSON.parse(item) as ChatMessage;
           messages.push(parsed);
         } catch {
-          // ignore bad string
+          continue;
         }
       } else {
         messages.push(item as ChatMessage);
@@ -43,10 +44,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, text, attachments } = (await req.json()) as {
+    const { user, text, attachments, session } = (await req.json()) as {
       user?: string;
       text?: string;
       attachments?: ChatAttachment[];
+      session?: string;
     };
 
     const hasText = !!text && !!text.trim();
@@ -59,6 +61,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const sessionId = session || "default";
     const safeUser = (user || "Anonymous").slice(0, 50);
     const safeText = text || "";
     const safeAttachments: ChatAttachment[] | undefined = hasAttachments
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       attachments: safeAttachments,
     };
-    const key = getTodayKey();
+    const key = getSessionKey(sessionId);
 
     try {
       await redis.rpush(key, message);
@@ -85,13 +88,31 @@ export async function POST(req: NextRequest) {
       console.error("Failed to write to Redis", err);
     }
 
-    await pusherServer.trigger("public-chat", "new-message", message);
+    await pusherServer.trigger(`chat-${sessionId}`, "new-message", message);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Failed to send message", error);
     return NextResponse.json(
       { error: "Failed to send message" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const session = searchParams.get("session") || "default";
+    const key = getSessionKey(session);
+
+    await redis.del(key);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to clear messages", error);
+    return NextResponse.json(
+      { error: "Failed to clear messages" },
       { status: 500 },
     );
   }

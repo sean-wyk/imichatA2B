@@ -9,6 +9,20 @@ type MessageContentProps = {
 };
 
 export function MessageContent({ content, isSelf }: MessageContentProps) {
+  const isFileLink = (url: string) => {
+    return url.includes("/api/telegram/file/");
+  };
+
+  const extractFileName = (text: string) => {
+    const match = text.match(/\*\*Name:\*\*\s*(.+)/);
+    return match ? match[1].trim() : null;
+  };
+
+  const extractFileSize = (text: string) => {
+    const match = text.match(/\*\*Size:\*\*\s*(.+)/);
+    return match ? match[1].trim() : null;
+  };
+
   return (
     <div className="message-content">
       <ReactMarkdown
@@ -105,18 +119,48 @@ export function MessageContent({ content, isSelf }: MessageContentProps) {
               {children}
             </td>
           ),
-          a: ({ children, href }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`underline hover:opacity-80 ${
-                isSelf ? "text-emerald-100" : "text-sky-600"
-              }`}
-            >
-              {children}
-            </a>
-          ),
+          a: ({ children, href }) => {
+            const isFile = href && isFileLink(href);
+            
+            if (isFile) {
+              const fileName = extractFileName(content) || "Download File";
+              const fileSize = extractFileSize(content);
+              
+              return (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg transition ${
+                    isSelf
+                      ? "bg-emerald-700/40 hover:bg-emerald-700/60 text-white"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-900"
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="text-xs font-medium">
+                    {fileName}
+                    {fileSize && <span className="opacity-70 ml-1">({fileSize})</span>}
+                  </span>
+                </a>
+              );
+            }
+            
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`underline hover:opacity-80 ${
+                  isSelf ? "text-emerald-100" : "text-sky-600"
+                }`}
+              >
+                {children}
+              </a>
+            );
+          },
           hr: () => (
             <hr
               className={`my-2 ${

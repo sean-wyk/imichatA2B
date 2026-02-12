@@ -1,0 +1,60 @@
+import { NextRequest, NextResponse } from "next/server";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
+
+export const dynamic = "force-dynamic";
+
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: fileId } = await params;
+
+  if (!TELEGRAM_BOT_TOKEN) {
+    return NextResponse.json(
+      { error: "Telegram 配置缺失" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const getPathUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`;
+    
+    const fetchOptions: any = {};
+    if (PROXY_URL) {
+      fetchOptions.dispatcher = new ProxyAgent(PROXY_URL);
+    }
+
+    const pathResponse = await undiciFetch(getPathUrl, fetchOptions);
+    const pathData = await pathResponse.json();
+
+    if (!pathData.ok) {
+      return NextResponse.json(
+        { error: "文件未找到或已过期" },
+        { status: 404 }
+      );
+    }
+
+    const filePath = pathData.result.file_path;
+    const downloadUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`;
+
+    // 通过代理获取文件并返回
+    const fileResponse = await undiciFetch(downloadUrl, fetchOptions);
+    const fileBuffer = await fileResponse.arrayBuffer();
+
+    return new NextResponse(fileBuffer, {
+      headers: {
+        "Content-Type": fileResponse.headers.get("content-type") || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${filePath.split('/').pop()}"`,
+      },
+    });
+  } catch (error) {
+    console.error("Download Error:", error);
+    return NextResponse.json(
+      { error: "下载失败：" + (error instanceof Error ? error.message : "未知错误") },
+      { status: 500 }
+    );
+  }
+}

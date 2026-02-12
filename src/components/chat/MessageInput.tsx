@@ -54,7 +54,7 @@ export function MessageInput({
         >
           <textarea
             className="min-h-[64px] flex-1 resize-none rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-emerald-500/80 focus:bg-white"
-            placeholder="Press Enter to send, Shift + Enter for new line"
+            placeholder="按 Enter 发送，Shift + Enter 换行"
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -77,7 +77,7 @@ export function MessageInput({
           />
           <div className="flex items-center gap-3 text-[11px] text-slate-400">
             <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700">
-              <span>{uploading ? "Uploading..." : "Upload"}</span>
+              <span>{uploading ? "上传中..." : "上传文件"}</span>
               <input
                 type="file"
                 className="hidden"
@@ -90,7 +90,7 @@ export function MessageInput({
             </label>
             {attachments.length > 0 && (
               <span className="text-xs text-emerald-600">
-                {attachments.length} file(s)
+                已添加 {attachments.length} 个文件
               </span>
             )}
           </div>
@@ -100,7 +100,7 @@ export function MessageInput({
           disabled={sending || !canSend}
           onClick={onSend}
         >
-          {sending ? "Sending..." : "Send"}
+          {sending ? "发送中..." : "发送"}
         </button>
       </div>
     </footer>

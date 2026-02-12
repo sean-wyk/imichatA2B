@@ -7,7 +7,7 @@ import { ChatHeader } from "@/components/chat/ChatHeader";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ImagePreview } from "@/components/chat/ImagePreview";
-import { uploadToImageHost } from "./page-upload-helper";
+import { Sidebar } from "@/components/chat/Sidebar";
 
 export default function Home() {
   const [user, setUser] = useState("");
@@ -20,6 +20,8 @@ export default function Home() {
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<ChatAttachment | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentSession, setCurrentSession] = useState("default");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function Home() {
 
     async function init() {
       try {
-        const res = await fetch("/api/messages");
+        const res = await fetch(`/api/messages?session=${currentSession}`);
         if (res.ok) {
           const data = (await res.json()) as { messages?: ChatMessage[] };
           if (!cancelled && Array.isArray(data.messages)) {
@@ -62,7 +64,7 @@ export default function Home() {
         return;
       }
 
-      const channel = pusher.subscribe("public-chat");
+      const channel = pusher.subscribe(`chat-${currentSession}`);
       channel.bind("new-message", (data: ChatMessage) => {
         setMessages((prev) => [...prev, data]);
       });
@@ -73,7 +75,7 @@ export default function Home() {
 
       return () => {
         channel.unbind_all();
-        pusher.unsubscribe("public-chat");
+        pusher.unsubscribe(`chat-${currentSession}`);
         pusher.disconnect();
       };
     }
@@ -84,7 +86,7 @@ export default function Home() {
       cancelled = true;
       void cleanupPromise;
     };
-  }, []);
+  }, [currentSession]);
 
   const handleSend = async () => {
     if (!text.trim() && attachments.length === 0) return;
@@ -97,7 +99,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ user, text, attachments }),
+        body: JSON.stringify({ user, text, attachments, session: currentSession }),
       });
 
       if (!res.ok) {
@@ -119,7 +121,25 @@ export default function Home() {
     setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
   };
 
-  const title = useMemo(() => "Chat Room", []);
+  const handleClearCache = async () => {
+    try {
+      await fetch(`/api/messages?session=${currentSession}`, {
+        method: "DELETE",
+      });
+      setMessages([]);
+    } catch (error) {
+      console.error("Failed to clear cache:", error);
+      alert("清空消息失败");
+    }
+  };
+
+  const handleSessionChange = (sessionId: string) => {
+    setCurrentSession(sessionId);
+    setMessages([]);
+    setSidebarOpen(false);
+  };
+
+  const title = useMemo(() => "聊天室", []);
 
   const handleFilesSelected = async (files: File[] | FileList | null) => {
     if (!files) return;
@@ -133,20 +153,40 @@ export default function Home() {
       for (const file of fileArray) {
         const isImage = file.type.startsWith("image/");
 
-        if (isImage) {
-          const url = await uploadToImageHost(file);
-          uploaded.push({
-            url,
-            name: file.name,
-            type: "image",
-          });
-        } else {
-          uploaded.push({
-            url: "",
-            name: file.name,
-            type: "file",
-          });
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const uploadRes = await fetch("/api/telegram/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const uploadData = await uploadRes.json();
+
+        if (!uploadData.success) {
+          throw new Error("Upload failed");
         }
+
+        await fetch("/api/telegram/files", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileId: uploadData.fileId,
+            fileName: uploadData.fileName,
+            fileSize: uploadData.fileSize,
+            uploadedBy: user,
+          }),
+        });
+
+        const downloadUrl = `/api/telegram/file/${uploadData.fileId}`;
+
+        uploaded.push({
+          url: downloadUrl,
+          name: file.name,
+          type: isImage ? "image" : "file",
+        });
       }
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (e) {
@@ -159,14 +199,47 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen w-full flex-col bg-white text-slate-900">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        currentSession={currentSession}
+        onSessionChange={handleSessionChange}
+        onClearCache={handleClearCache}
+      />
+
       <div className="flex h-full w-full flex-1 flex-col px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-        <ChatHeader
-          title={title}
-          user={user}
-          tempUser={tempUser}
-          onTempUserChange={setTempUser}
-          onConfirmUser={() => setUser(tempUser.trim() || user)}
-        />
+        <div className="flex items-center gap-3 mb-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 hover:bg-slate-100 rounded-lg transition"
+            title="打开设置"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="flex-1">
+            <ChatHeader
+              title={title}
+              user={user}
+              tempUser={tempUser}
+              onTempUserChange={setTempUser}
+              onConfirmUser={() => setUser(tempUser.trim() || user)}
+            />
+          </div>
+        </div>
+
+        <div className="mb-3 flex justify-end">
+          <a
+            href="/storage"
+            className="text-xs text-slate-600 hover:text-emerald-600 transition flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            文件存储
+          </a>
+        </div>
 
         <MessageList
           messages={messages}

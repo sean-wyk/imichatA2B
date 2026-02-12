@@ -22,14 +22,14 @@ export function ChatHeader({
             {title}
           </h1>
           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-100">
-            Public
+            公共房间
           </span>
         </div>
         <p className="text-xs text-slate-500">
-          Real-time messaging for all online users.
+          所有人共享一个公开房间，发送的消息会实时广播给在线用户。
         </p>
         <p className="text-[11px] text-slate-500">
-          Current:
+          当前昵称：
           <span className="font-medium text-slate-900">{user}</span>
         </p>
       </div>
@@ -39,14 +39,14 @@ export function ChatHeader({
           value={tempUser}
           maxLength={20}
           onChange={(e) => onTempUserChange(e.target.value)}
-          placeholder="New name"
+          placeholder="输入新昵称"
         />
         <button
           className="h-8 rounded-full bg-slate-900 px-3 text-xs font-medium text-slate-50 shadow-sm transition hover:bg-black hover:shadow disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onConfirmUser}
           disabled={!tempUser.trim()}
         >
-          Change
+          修改昵称
         </button>
       </div>
     </header>
