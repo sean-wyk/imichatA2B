@@ -65,18 +65,6 @@ export default function TestPage() {
                     {result.config?.chatIdValue}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">HTTPS_PROXY:</span>
-                  <span className={`font-medium ${result.config?.HTTPS_PROXY !== "未配置" ? "text-green-600" : "text-amber-600"}`}>
-                    {result.config?.HTTPS_PROXY}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">HTTP_PROXY:</span>
-                  <span className={`font-medium ${result.config?.HTTP_PROXY !== "未配置" ? "text-green-600" : "text-amber-600"}`}>
-                    {result.config?.HTTP_PROXY}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -86,15 +74,9 @@ export default function TestPage() {
               </h2>
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-slate-600 mb-1">直连测试:</p>
-                  <p className={`text-sm font-medium ${result.directTest?.includes("可访问") ? "text-green-600" : "text-red-600"}`}>
-                    {result.directTest}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600 mb-1">代理测试:</p>
-                  <p className={`text-sm font-medium ${result.proxyTest?.includes("可访问") ? "text-green-600" : "text-red-600"}`}>
-                    {result.proxyTest}
+                  <p className="text-sm text-slate-600 mb-1">API 测试:</p>
+                  <p className={`text-sm font-medium ${result.apiTest?.includes("可访问") ? "text-green-600" : "text-red-600"}`}>
+                    {result.apiTest}
                   </p>
                 </div>
               </div>
@@ -120,11 +102,8 @@ export default function TestPage() {
                 {result.config?.TELEGRAM_CHAT_ID === "未配置" && (
                   <li>• 请在 .env 文件中配置 TELEGRAM_CHAT_ID</li>
                 )}
-                {result.directTest?.includes("失败") && result.config?.HTTPS_PROXY === "未配置" && (
-                  <li>• 直连失败，建议配置 HTTPS_PROXY 代理</li>
-                )}
-                {result.proxyTest?.includes("失败") && result.config?.HTTPS_PROXY !== "未配置" && (
-                  <li>• 代理连接失败，请检查代理地址和端口是否正确</li>
+                {result.apiTest?.includes("失败") && (
+                  <li>• API 连接失败，请检查网络连接</li>
                 )}
               </ul>
             </div>

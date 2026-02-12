@@ -164,7 +164,7 @@ export default function Home() {
         const uploadData = await uploadRes.json();
 
         if (!uploadData.success) {
-          throw new Error("Upload failed");
+          throw new Error(uploadData.error || "上传失败");
         }
 
         await fetch("/api/telegram/files", {
@@ -190,8 +190,10 @@ export default function Home() {
       }
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (e) {
-      console.error(e);
-      setError("Upload failed, please try again");
+      console.error("文件上传错误:", e);
+      const errorMsg = e instanceof Error ? e.message : "上传失败";
+      setError(errorMsg);
+      alert(`文件上传失败：${errorMsg}\n\n如果在 Vercel 部署环境，Telegram 文件上传功能需要额外配置。建议本地运行或使用其他存储服务。`);
     } finally {
       setUploading(false);
     }

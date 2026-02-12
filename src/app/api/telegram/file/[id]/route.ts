@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 export const dynamic = "force-dynamic";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 
 interface TelegramFileResponse {
   ok: boolean;
@@ -29,12 +27,7 @@ export async function GET(
   try {
     const getPathUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`;
     
-    const fetchOptions: Record<string, unknown> = {};
-    if (PROXY_URL) {
-      fetchOptions.dispatcher = new ProxyAgent(PROXY_URL);
-    }
-
-    const pathResponse = await undiciFetch(getPathUrl, fetchOptions);
+    const pathResponse = await fetch(getPathUrl);
     const pathData = await pathResponse.json() as TelegramFileResponse;
 
     if (!pathData.ok || !pathData.result) {
@@ -47,7 +40,7 @@ export async function GET(
     const filePath = pathData.result.file_path;
     const downloadUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`;
 
-    const fileResponse = await undiciFetch(downloadUrl, fetchOptions);
+    const fileResponse = await fetch(downloadUrl);
     const fileBuffer = await fileResponse.arrayBuffer();
 
     return new NextResponse(fileBuffer, {
