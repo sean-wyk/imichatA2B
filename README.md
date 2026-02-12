@@ -60,6 +60,14 @@ PUSHER_CLUSTER=你的_cluster
 
 NEXT_PUBLIC_PUSHER_KEY=你的_key
 NEXT_PUBLIC_PUSHER_CLUSTER=你的_cluster
+
+
+
+#PUSHER
+app_id = "2114612"
+key = "440fbc395099050a9bd7"
+secret = "3e3884d37c5dbc43b4ba"
+cluster = "ap3"
 ```
 
 #### 本地开发环境
