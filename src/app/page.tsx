@@ -36,26 +36,57 @@ export default function Home() {
     }
   }, [messages]);
 
-  // 连接 Pusher，订阅消息
+  // 初始化加载当天历史消息 + 连接 Pusher，订阅新消息
   useEffect(() => {
-    const pusher = getPusherClient();
-    if (!pusher) {
-      setError("实时服务未配置，请先在 Vercel 中配置 Pusher 环境变量。");
-      setConnecting(false);
-      return;
+    let cancelled = false;
+
+    async function init() {
+      try {
+        // 先拉取当天历史消息
+        const res = await fetch("/api/messages");
+        if (res.ok) {
+          const data = (await res.json()) as { messages?: ChatMessage[] };
+          if (!cancelled && Array.isArray(data.messages)) {
+            setMessages(data.messages);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setError("加载历史消息失败");
+        }
+      }
+
+      const pusher = getPusherClient();
+      if (!pusher) {
+        if (!cancelled) {
+          setError("实时服务未配置，请先在 Vercel 中配置 Pusher 环境变量。");
+          setConnecting(false);
+        }
+        return;
+      }
+
+      const channel = pusher.subscribe("public-chat");
+      channel.bind("new-message", (data: ChatMessage) => {
+        setMessages((prev) => [...prev, data]);
+      });
+
+      if (!cancelled) {
+        setConnecting(false);
+      }
+
+      return () => {
+        channel.unbind_all();
+        pusher.unsubscribe("public-chat");
+        pusher.disconnect();
+      };
     }
 
-    const channel = pusher.subscribe("public-chat");
-    channel.bind("new-message", (data: ChatMessage) => {
-      setMessages((prev) => [...prev, data]);
-    });
-
-    setConnecting(false);
+    const cleanupPromise = init();
 
     return () => {
-      channel.unbind_all();
-      pusher.unsubscribe("public-chat");
-      pusher.disconnect();
+      cancelled = true;
+      void cleanupPromise;
     };
   }, []);
 
