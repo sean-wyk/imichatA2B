@@ -3,6 +3,11 @@ import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 export const dynamic = "force-dynamic";
 
+interface TelegramTestResponse {
+  ok: boolean;
+  result?: unknown;
+}
+
 export async function GET() {
   const config = {
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN ? "已配置" : "未配置",
@@ -15,7 +20,6 @@ export async function GET() {
 
   console.log("环境变量检查:", config);
 
-  // 测试代理连接
   let proxyTest = "未测试";
   const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
   
@@ -36,7 +40,6 @@ export async function GET() {
     }
   }
 
-  // 测试直连
   let directTest = "未测试";
   try {
     console.log("测试直连 Telegram API...");

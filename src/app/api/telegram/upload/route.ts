@@ -7,6 +7,19 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 
+interface TelegramUploadResponse {
+  ok: boolean;
+  result?: {
+    document: {
+      file_id: string;
+      file_name: string;
+      file_size: number;
+    };
+  };
+  error_code?: number;
+  description?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
@@ -30,11 +43,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 将 File 转换为 Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 使用 undici 的 FormData
     const { FormData: UndiciFormData } = await import("undici");
     const tgFormData = new UndiciFormData();
     tgFormData.append("document", new Blob([buffer]), file.name);
@@ -43,12 +54,11 @@ export async function POST(request: NextRequest) {
 
     const tgUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`;
     
-    const fetchOptions: any = {
+    const fetchOptions: Record<string, unknown> = {
       method: "POST",
       body: tgFormData,
     };
 
-    // 如果配置了代理，使用 ProxyAgent
     if (PROXY_URL) {
       console.log("Using proxy:", PROXY_URL);
       fetchOptions.dispatcher = new ProxyAgent(PROXY_URL);
@@ -56,13 +66,12 @@ export async function POST(request: NextRequest) {
 
     try {
       const response = await undiciFetch(tgUrl, fetchOptions);
+      const result = await response.json() as TelegramUploadResponse;
 
-      const result = await response.json();
-
-      if (!result.ok) {
+      if (!result.ok || !result.result) {
         console.error("Telegram Error:", result);
         return NextResponse.json(
-          { error: "上传到 Telegram 失败" },
+          { error: result.description || "上传到 Telegram 失败" },
           { status: 500 }
         );
       }
