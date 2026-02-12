@@ -7,7 +7,7 @@ type MessageListProps = {
   currentUser: string;
   connecting: boolean;
   error: string | null;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
   onImageClick?: (image: ChatAttachment) => void;
   onDeleteMessage?: (messageId: string) => void;
 };
