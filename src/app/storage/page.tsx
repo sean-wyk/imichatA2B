@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import packageJson from "@/../package.json";
 import { FileUpload } from "@/components/telegram/FileUpload";
 import { FileList } from "@/components/telegram/FileList";
 
 export default function StoragePage() {
+  const appVersion = `v${packageJson.version}`;
   const [userName, setUserName] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -57,6 +59,10 @@ export default function StoragePage() {
             </h2>
             <FileList refreshTrigger={refreshTrigger} />
           </section>
+        </div>
+
+        <div className="mt-10 text-center text-xs text-slate-400">
+          {appVersion}
         </div>
       </div>
     </main>

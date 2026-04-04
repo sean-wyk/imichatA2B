@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import packageJson from "@/../package.json";
 import { getPusherClient } from "@/lib/pusher";
 import type { ChatAttachment, ChatMessage } from "@/types/chat";
 import { ChatHeader } from "@/components/chat/ChatHeader";
@@ -10,6 +11,7 @@ import { ImagePreview } from "@/components/chat/ImagePreview";
 import { Sidebar } from "@/components/chat/Sidebar";
 
 export default function Home() {
+  const appVersion = `v${packageJson.version}`;
   const [user, setUser] = useState("");
   const [tempUser, setTempUser] = useState("");
   const [text, setText] = useState("");
@@ -265,6 +267,9 @@ export default function Home() {
         />
 
 
+      </div>
+      <div className="px-4 pb-4 text-center text-xs text-slate-400 sm:px-6 lg:px-8">
+        {appVersion}
       </div>
       <ImagePreview image={previewImage} onClose={() => setPreviewImage(null)} />
     </main>
