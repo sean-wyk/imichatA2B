@@ -85,6 +85,15 @@ NEXT_PUBLIC_PUSHER_CLUSTER=xxx
 ```
 
 > `.env.local` 不会被提交到 Git，用于本地开发调试。
+>
+> 如果你在本地访问 Telegram 需要代理，可以只在 `.env.local` 里添加：
+>
+> ```bash
+> HTTPS_PROXY=http://127.0.0.1:10808
+> HTTP_PROXY=http://127.0.0.1:10808
+> ```
+>
+> 部署到 Vercel 时不要填写本地 `127.0.0.1` 代理。Vercel 会直接从它自己的服务器访问 Telegram。
 
 ---
 
@@ -167,6 +176,7 @@ NEXT_PUBLIC_PUSHER_CLUSTER=xxx
    - `NEXT_PUBLIC_PUSHER_CLUSTER`
 
    建议在 `Production / Preview / Development` 环境中都配置同样的值，保存后重新部署。
+   不要把本地的 `HTTP_PROXY` / `HTTPS_PROXY` 一起填进 Vercel，尤其不要填 `127.0.0.1`。
 
 4. **访问线上地址**
 

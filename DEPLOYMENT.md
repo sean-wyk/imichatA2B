@@ -1,70 +1,36 @@
-# 部署说明
+# Deployment Notes
 
-## Vercel 部署限制
+## Vercel and Telegram Uploads
 
-由于 Vercel 的 Serverless 环境限制，Telegram 文件上传功能在 Vercel 上**无法直接使用**。
+This project can be deployed to Vercel.
 
-### 原因
+The important detail is that your local proxy only exists on your own machine. A Vercel Function cannot use `http://127.0.0.1:10808` from your laptop, so you should not copy local proxy variables into Vercel production settings.
 
-1. Vercel 不支持 HTTP/HTTPS 代理
-2. 中国大陆无法直接访问 Telegram API
-3. `undici` 的 `ProxyAgent` 在 Vercel Edge Runtime 中不可用
+Current behavior:
 
-### 解决方案
+- Local development:
+  - If `HTTP_PROXY` or `HTTPS_PROXY` is set, server-side Telegram requests will use it.
+- Vercel:
+  - If the proxy points to `127.0.0.1`, `localhost`, or `::1`, the app will ignore it automatically and connect to Telegram directly.
 
-#### 方案 1：本地运行（推荐用于开发）
+In most Vercel regions, outbound access to the Telegram Bot API works without an extra proxy.
 
-```bash
-npm run dev
-```
+## Vercel Limits
 
-确保 `.env` 文件中配置了代理：
+Vercel Functions still have request and response body size limits. That means Telegram upload or download through your Next.js API routes is suitable for small files, but large files can fail because of platform limits.
+
+If you need larger uploads, consider:
+
+- Cloudflare R2
+- Aliyun OSS
+- Qiniu
+- Railway / Render / VPS for the upload proxy
+
+## Required Environment Variables
+
+Set these in Vercel Project Settings -> Environment Variables:
 
 ```env
-HTTPS_PROXY=http://127.0.0.1:7890
-```
-
-#### 方案 2：使用 Cloudflare Workers 代理
-
-创建一个 Cloudflare Worker 来转发 Telegram API 请求：
-
-```javascript
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-    const telegramUrl = `https://api.telegram.org${url.pathname}${url.search}`;
-    
-    return fetch(telegramUrl, {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-    });
-  }
-}
-```
-
-然后修改 `src/app/api/telegram/upload/route.ts`，将 `https://api.telegram.org` 替换为你的 Worker URL。
-
-#### 方案 3：切换到其他存储服务
-
-推荐使用以下服务替代 Telegram：
-
-- **阿里云 OSS**：40 GB 免费存储
-- **七牛云**：10 GB 免费存储
-- **Cloudflare R2**：10 GB 免费存储
-
-#### 方案 4：部署到支持代理的平台
-
-- Railway
-- Render
-- Fly.io
-- 自建 VPS
-
-## 环境变量配置
-
-在 Vercel 项目设置中添加以下环境变量：
-
-```
 PUSHER_APP_ID=your_app_id
 PUSHER_KEY=your_key
 PUSHER_SECRET=your_secret
@@ -80,22 +46,15 @@ TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 ```
 
-注意：即使配置了 `TELEGRAM_BOT_TOKEN`，文件上传功能在 Vercel 上仍然无法使用。
+Do not set these in Vercel unless your deployed environment really has such a proxy:
 
-## 功能可用性
+```env
+HTTPS_PROXY=http://127.0.0.1:10808
+HTTP_PROXY=http://127.0.0.1:10808
+```
 
-| 功能 | 本地开发 | Vercel 部署 |
-|------|---------|------------|
-| 实时聊天 | ✅ | ✅ |
-| 消息存储 | ✅ | ✅ |
-| 多会话管理 | ✅ | ✅ |
-| Telegram 文件上传 | ✅ | ❌ |
-| Telegram 文件下载 | ✅ | ❌ |
+## Recommended Local Setup
 
-## 推荐部署方式
+Use `.env.local` for local secrets and local proxy settings. Do not commit real secrets.
 
-如果需要完整功能（包括 Telegram 文件存储），建议：
-
-1. 使用 Railway 或 Render 部署（支持 Docker）
-2. 或者使用 Cloudflare Workers 作为 Telegram API 代理
-3. 或者切换到阿里云 OSS 等对象存储服务
+You can start from `.env.example` and fill in your own values.
